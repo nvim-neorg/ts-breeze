@@ -6,9 +6,14 @@ use tree_sitter::Tree;
 
 pub mod c_functions;
 
+/// Parses a file and returns its [`Tree`].
+///
+/// * `filepath`: The path of the file to read.
 fn parse_file(filepath: &std::path::PathBuf) -> Result<Tree> {
     let mut file = File::open(filepath)?;
 
+    // TODO: When a file exceeds a certain size, stream the file in block-by-block with
+    // parse_with()?
     let mut content = String::new();
     file.read_to_string(&mut content)?;
 
@@ -43,12 +48,10 @@ pub fn parse_files(workspace: neorg_dirman::workspace::Workspace) -> Result<Vec<
     }
 
     for _ in 0..file_count {
-        let (i, tree) = match rx.recv()? {
-            (i, Ok(tree)) => (i, tree),
-            (_, Err(err)) => return Err(anyhow!(err)),
-        };
-
-        output[i] = Some(tree);
+        match rx.recv()? {
+            (i, Ok(tree)) => output[i] = Some(tree),
+            (_, Err(err)) => return Err(err),
+        }
     }
 
     Ok(output.into_iter().map(|opt| opt.unwrap()).collect())
