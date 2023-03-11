@@ -17,15 +17,13 @@ fn parse_file(filepath: &std::path::PathBuf) -> Result<Tree> {
 
     parser.parse(content, None).ok_or_else(|| {
         anyhow!(format!(
-            "Parsing for file {} timed out!",
+            "Parsing for file '{}' timed out!",
             filepath.display()
         ))
     })
 }
 
-// TODO: Change Vec<Option<Tree>> to Result<Vec<Tree>, (Err, output.filter(|x| x.is_some()))>
-//
-pub fn parse_files(workspace: neorg_dirman::workspace::Workspace) -> Vec<Option<Tree>> {
+pub fn parse_files(workspace: neorg_dirman::workspace::Workspace) -> Result<Vec<Tree>> {
     let files = workspace.files();
 
     let threadpool = Builder::new().name("neorg".into()).build();
@@ -39,17 +37,21 @@ pub fn parse_files(workspace: neorg_dirman::workspace::Workspace) -> Vec<Option<
         let tx_clone = tx.clone();
 
         threadpool.execute(move || {
-            let parsed = parse_file(&file).unwrap();
+            let parsed = parse_file(&file);
             tx_clone.send((i, parsed)).unwrap();
         });
     }
 
     for _ in 0..file_count {
-        let (i, tree) = rx.recv().unwrap();
+        let (i, tree) = match rx.recv()? {
+            (i, Ok(tree)) => (i, tree),
+            (_, Err(err)) => return Err(anyhow!(err)),
+        };
+
         output[i] = Some(tree);
     }
 
-    output
+    Ok(output.into_iter().map(|opt| opt.unwrap()).collect())
 }
 
 #[cfg(test)]
@@ -72,8 +74,10 @@ mod tests {
             name: "example workspace".into(),
             path: "test/example_workspace".into(),
         };
-        let trees = parse_files(workspace);
 
-        assert!(trees[0].is_some());
+        let trees =
+            parse_files(workspace).expect("Unable to parse files in the current workspace!");
+
+        assert!(trees[0].root_node().kind() == "document");
     }
 }
