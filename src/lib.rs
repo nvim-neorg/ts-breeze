@@ -1,8 +1,8 @@
-use tree_sitter::Tree;
+use anyhow::{anyhow, Result};
 use rusty_pool::Builder;
-use std::io::Read;
 use std::fs::File;
-use anyhow::{Result, anyhow};
+use std::io::Read;
+use tree_sitter::Tree;
 
 pub mod c_functions;
 
@@ -15,7 +15,12 @@ fn parse_file(filepath: &std::path::PathBuf) -> Result<Tree> {
     let mut parser = tree_sitter::Parser::new();
     parser.set_language(tree_sitter_norg::language())?;
 
-    parser.parse(content, None).ok_or_else(|| anyhow!(format!("Parsing for file {} timed out!", filepath.display())))
+    parser.parse(content, None).ok_or_else(|| {
+        anyhow!(format!(
+            "Parsing for file {} timed out!",
+            filepath.display()
+        ))
+    })
 }
 
 // TODO: Change Vec<Option<Tree>> to Result<Vec<Tree>, (Err, output.filter(|x| x.is_some()))>
@@ -50,8 +55,8 @@ pub fn parse_files(workspace: neorg_dirman::workspace::Workspace) -> Vec<Option<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
     use neorg_dirman::workspace::Workspace;
+    use std::path::PathBuf;
 
     #[test]
     fn test_parse_file() {
