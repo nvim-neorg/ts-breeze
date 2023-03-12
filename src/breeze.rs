@@ -52,7 +52,7 @@ pub fn parse_files(workspace: neorg_dirman::workspace::Workspace) -> Result<Vec<
         }
     }
 
-    Ok(output.into_iter().map(|opt| opt.unwrap()).collect())
+    Ok(output.into_iter().flatten().collect())
 }
 
 #[cfg(test)]
