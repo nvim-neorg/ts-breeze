@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use rusty_pool::Builder;
 use std::fs::File;
 use std::io::Read;
+use std::path::PathBuf;
 use tree_sitter::Tree;
 
 /// Parses a file and returns its [`Tree`].
@@ -26,9 +27,7 @@ fn parse_file(filepath: &std::path::PathBuf) -> Result<Tree> {
     })
 }
 
-pub fn parse_files(workspace: neorg_dirman::workspace::Workspace) -> Result<Vec<Tree>> {
-    let files = workspace.files();
-
+pub fn parse_files(files: Vec<PathBuf>) -> Result<Vec<Tree>> {
     let threadpool = Builder::new().name("neorg".into()).build();
 
     let mut output: Vec<Option<Tree>> = vec![None; files.len()];
@@ -76,8 +75,8 @@ mod tests {
             path: "test/example_workspace".into(),
         };
 
-        let trees =
-            parse_files(workspace).expect("Unable to parse files in the current workspace!");
+        let trees = parse_files(workspace.files())
+            .expect("Unable to parse files in the current workspace!");
 
         assert!(trees[0].root_node().kind() == "document");
     }
