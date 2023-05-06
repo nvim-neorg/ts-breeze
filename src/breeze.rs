@@ -29,11 +29,12 @@ fn parse_file(filepath: &std::path::PathBuf, parser: &mut Parser) -> Result<Tree
 pub fn parse_files(
     files: Vec<PathBuf>,
     language: Language,
+    num_jobs: Option<usize>,
     callback: &'static (dyn Fn(Tree) + Send + Sync),
 ) {
     let threadpool = Builder::new()
         .thread_name("neorg".into())
-        .num_threads(8)
+        .num_threads(num_jobs.unwrap_or(4))
         .build();
 
     for file in files {
@@ -75,6 +76,7 @@ mod tests {
         parse_files(
             workspace.files(),
             tree_sitter_norg::language(),
+            None,
             &|tree: Tree| assert!(tree.root_node().kind() == "document"),
         );
     }
