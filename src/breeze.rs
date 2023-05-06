@@ -1,23 +1,22 @@
 // TODO: Generalize to work with any language
 
 use anyhow::{anyhow, Result};
-use rusty_pool::Builder;
-use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
-use tree_sitter::{Tree, Language};
+use std::fs::File;
+use threadpool::Builder;
+use tree_sitter::{Parser, Tree};
 
 /// Parses a file and returns its [`Tree`].
 ///
 /// * `filepath`: The path of the file to read.
-fn parse_file(filepath: &std::path::PathBuf, language: Language) -> Result<Tree> {
+fn parse_file(filepath: &std::path::PathBuf, parser: &mut Parser) -> Result<Tree> {
     let mut file = File::open(filepath)?;
 
     let mut content = String::new();
     file.read_to_string(&mut content)?;
 
-    let mut parser = tree_sitter::Parser::new();
-    parser.set_language(language)?;
+    drop(file);
 
     parser.parse(content, None).ok_or_else(|| {
         anyhow!(format!(
@@ -27,35 +26,24 @@ fn parse_file(filepath: &std::path::PathBuf, language: Language) -> Result<Tree>
     })
 }
 
-pub fn parse_files(files: Vec<PathBuf>) -> Result<Vec<Tree>> {
-    let threadpool = Builder::new().name("neorg".into()).build();
-
-    let mut output: Vec<Option<Tree>> = vec![None; files.len()];
-    let file_count = files.len();
-
-    let (tx, rx) = crossbeam_channel::bounded(file_count);
+pub fn parse_files(files: Vec<PathBuf>, callback: &'static (dyn Fn(Tree) + Send + Sync)) -> Result<()> {
+    let threadpool = Builder::new().thread_name("neorg".into()).num_threads(8).build();
 
     let language = tree_sitter_norg::language();
 
-    for (i, file) in files.into_iter().enumerate() {
-        let tx_clone = tx.clone();
-
+    for file in files {
         threadpool.execute(move || {
-            let parsed = parse_file(&file, language.clone());
-            tx_clone.send((i, parsed)).unwrap();
+            let mut parser = Parser::new();
+            parser.set_language(language).unwrap();
+
+            let tree = parse_file(&file, &mut parser).unwrap();
+            callback(tree);
         });
     }
 
-    threadpool.shutdown_join();
+    threadpool.join();
 
-    for _ in 0..file_count {
-        match rx.recv()? {
-            (i, Ok(tree)) => output[i] = Some(tree),
-            (_, Err(err)) => return Err(err),
-        }
-    }
-
-    Ok(output.into_iter().flatten().collect())
+    Ok(())
 }
 
 #[cfg(test)]
@@ -67,7 +55,9 @@ mod tests {
     #[test]
     fn test_parse_file() {
         let filepath = PathBuf::from("test/example_workspace/file1.norg");
-        let tree = parse_file(&filepath, tree_sitter_norg::language()).unwrap();
+        let mut parser = Parser::new();
+        parser.set_language(tree_sitter_norg::language()).unwrap();
+        let tree = parse_file(&filepath, &mut parser).unwrap();
 
         assert!(tree.root_node().kind() == "document");
     }
@@ -79,9 +69,7 @@ mod tests {
             path: "test/example_workspace".into(),
         };
 
-        let trees = parse_files(workspace.files())
+        parse_files(workspace.files(), &|tree: Tree| assert!(tree.root_node().kind() == "document"))
             .expect("Unable to parse files in the current workspace!");
-
-        assert!(trees[0].root_node().kind() == "document");
     }
 }
