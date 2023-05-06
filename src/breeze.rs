@@ -1,11 +1,11 @@
 // TODO: Generalize to work with any language
 
 use anyhow::{anyhow, Result};
+use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
-use std::fs::File;
 use threadpool::Builder;
-use tree_sitter::{Parser, Tree, Language};
+use tree_sitter::{Language, Parser, Tree};
 
 /// Parses a file and returns its [`Tree`].
 ///
@@ -26,8 +26,15 @@ fn parse_file(filepath: &std::path::PathBuf, parser: &mut Parser) -> Result<Tree
     })
 }
 
-pub fn parse_files(files: Vec<PathBuf>, language: Language, callback: &'static (dyn Fn(Tree) + Send + Sync)) {
-    let threadpool = Builder::new().thread_name("neorg".into()).num_threads(8).build();
+pub fn parse_files(
+    files: Vec<PathBuf>,
+    language: Language,
+    callback: &'static (dyn Fn(Tree) + Send + Sync),
+) {
+    let threadpool = Builder::new()
+        .thread_name("neorg".into())
+        .num_threads(8)
+        .build();
 
     for file in files {
         threadpool.execute(move || {
@@ -65,6 +72,10 @@ mod tests {
             path: "test/example_workspace".into(),
         };
 
-        parse_files(workspace.files(), tree_sitter_norg::language(), &|tree: Tree| assert!(tree.root_node().kind() == "document"));
+        parse_files(
+            workspace.files(),
+            tree_sitter_norg::language(),
+            &|tree: Tree| assert!(tree.root_node().kind() == "document"),
+        );
     }
 }
