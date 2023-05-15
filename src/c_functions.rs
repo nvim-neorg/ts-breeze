@@ -1,5 +1,5 @@
 use std::{
-    ffi::{c_char, CString},
+    ffi::{c_char, CStr},
     mem::ManuallyDrop,
     path::PathBuf,
 };
@@ -27,16 +27,14 @@ pub unsafe extern "C" fn parse_file_list(
 
     let file_list = ManuallyDrop::new(Box::from_raw(file_list));
 
-    let files = ManuallyDrop::new(
-        Vec::from_raw_parts(
-            file_list.data as *mut *mut c_char,
-            file_list.length,
-            file_list._capacity,
-        )
-        .into_iter()
-        .map(|str| CString::from_raw(str).to_string_lossy().into_owned().into())
-        .collect::<Vec<PathBuf>>(),
-    );
+    let files = ManuallyDrop::new(Vec::from_raw_parts(
+        file_list.data as *mut *const c_char,
+        file_list.length,
+        file_list._capacity,
+    ))
+    .iter()
+    .map(|str| CStr::from_ptr(*str).to_string_lossy().into_owned().into())
+    .collect::<Vec<PathBuf>>();
 
     let language = tree_sitter::Language::from_raw(language);
 
