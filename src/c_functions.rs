@@ -72,10 +72,10 @@ mod tests {
         }
 
         unsafe {
-            let name = CString::new("test").unwrap().into_raw();
-            let path = CString::new("test/example_workspace/").unwrap().into_raw();
+            let name = CString::new("test").unwrap();
+            let path = CString::new("test/example_workspace/").unwrap();
 
-            let workspace = create_workspace(name, path);
+            let workspace = create_workspace(name.as_ptr(), path.as_ptr());
             let workspace_files = workspace_files(workspace);
 
             parse_file_list(
