@@ -25,7 +25,7 @@ pub unsafe extern "C" fn parse_file_list(
         "Parameter `parser` must not be `null`!"
     );
 
-    let file_list = Box::from_raw(file_list);
+    let file_list = ManuallyDrop::new(Box::from_raw(file_list));
 
     let files = ManuallyDrop::new(
         Vec::from_raw_parts(
