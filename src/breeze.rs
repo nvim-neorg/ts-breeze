@@ -1,9 +1,9 @@
 // TODO: Generalize to work with any language
 
 use anyhow::{anyhow, Result};
-use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
+use std::{fs::File, sync::Arc};
 use threadpool::Builder;
 use tree_sitter::{Language, Parser, Tree};
 
@@ -26,18 +26,20 @@ fn parse_file(filepath: &std::path::PathBuf, parser: &mut Parser) -> Result<Tree
     })
 }
 
-pub fn parse_files(
-    files: Vec<PathBuf>,
-    language: Language,
-    num_jobs: Option<usize>,
-    callback: &'static (dyn Fn(Tree) + Send + Sync),
-) {
+pub fn parse_files<F>(files: Vec<PathBuf>, language: Language, num_jobs: Option<usize>, callback: F)
+where
+    F: Fn(Tree) + Send + Sync + 'static,
+{
     let threadpool = Builder::new()
         .thread_name("neorg".into())
         .num_threads(num_jobs.unwrap_or(4))
         .build();
 
+    let callback = Arc::new(callback);
+
     for file in files {
+        let callback = Arc::clone(&callback);
+
         threadpool.execute(move || {
             let mut parser = Parser::new();
             parser.set_language(language).unwrap();
