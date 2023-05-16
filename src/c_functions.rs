@@ -1,6 +1,5 @@
 use std::{
     ffi::{c_char, CStr},
-    mem::ManuallyDrop,
     path::PathBuf,
 };
 
@@ -15,7 +14,7 @@ use crate::breeze;
 type Callback = unsafe extern "C" fn(tree: *mut TSTree);
 
 pub unsafe extern "C" fn parse_file_list(
-    file_list: *mut FileList,
+    file_list: *const FileList,
     language: *mut TSLanguage,
     callback: Callback,
 ) {
@@ -25,13 +24,10 @@ pub unsafe extern "C" fn parse_file_list(
         "Parameter `parser` must not be `null`!"
     );
 
-    let file_list = ManuallyDrop::new(Box::from_raw(file_list));
-
-    let files = ManuallyDrop::new(Vec::from_raw_parts(
-        file_list.data as *mut *const c_char,
-        file_list.length,
-        file_list._capacity,
-    ))
+    let files = std::slice::from_raw_parts(
+        (*file_list).data as *const *const c_char,
+        (*file_list).length,
+    )
     .iter()
     .map(|str| CStr::from_ptr(*str).to_string_lossy().into_owned().into())
     .collect::<Vec<PathBuf>>();
@@ -51,7 +47,7 @@ pub unsafe extern "C" fn parse_file_list(
 
     let callback = Wrapper(callback);
 
-    breeze::parse_files(files.to_vec(), language, Some(4), move |tree: Tree| {
+    breeze::parse_files(files, language, Some(4), move |tree: Tree| {
         callback.call(tree.into_raw())
     });
 }
