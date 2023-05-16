@@ -10,6 +10,6 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.69"
 neorg-dirman = "0.1.0"
-threadpool = "1.8.1"
+rusty_pool = "0.7.0"
 tree-sitter = { git = "https://github.com/tree-sitter/tree-sitter" }
 tree-sitter-norg = { git = "https://github.com/nvim-neorg/tree-sitter-norg2" }

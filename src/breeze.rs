@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 use std::io::Read;
 use std::path::PathBuf;
 use std::{fs::File, sync::Arc};
-use threadpool::Builder;
+use rusty_pool::Builder;
 use tree_sitter::{Language, Parser, Tree};
 
 /// Parses a file and returns its [`Tree`].
@@ -31,8 +31,8 @@ where
     F: Fn(Tree) + Send + Sync + 'static,
 {
     let threadpool = Builder::new()
-        .thread_name("neorg".into())
-        .num_threads(num_jobs.unwrap_or(4))
+        .name("neorg".into())
+        .max_size(num_jobs.unwrap_or(4))
         .build();
 
     let callback = Arc::new(callback);
