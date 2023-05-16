@@ -1,0 +1,25 @@
+name: Valgrind Test
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install Valgrind and LibC Debug Symbols
+      run: |
+        sudo apt update
+        sudo apt install -y valgrind libc6-dbg
+    - name: Install cargo-valgrind
+      run: |
+        cargo install cargo-valgrind
+    - name: Run Valgrind
+      run: |
+        cargo valgrind test
