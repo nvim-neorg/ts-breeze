@@ -16,8 +16,6 @@ fn parse_file(filepath: &std::path::PathBuf, parser: &mut Parser) -> Result<(Tre
     let mut content = String::new();
     file.read_to_string(&mut content)?;
 
-    drop(file);
-
     match parser.parse(&content, None) {
         Some(tree) => Ok((tree, content)),
         None => Err(anyhow!(format!(
@@ -27,6 +25,12 @@ fn parse_file(filepath: &std::path::PathBuf, parser: &mut Parser) -> Result<(Tre
     }
 }
 
+/// Parses a set of files on multiple threads given a tree-sitter language.
+///
+/// * `files`: The files to parse.
+/// * `language`: A tree-sitter language to parse.
+/// * `num_jobs`: An optional cap for the amount of threads to spawn.
+/// * `callback`: A capture to invoke for each file.
 pub fn parse_files<F>(files: Vec<PathBuf>, language: Language, num_jobs: Option<usize>, callback: F)
 where
     F: FnMut(Tree, (PathBuf, String)) + Send + Sync + 'static,
