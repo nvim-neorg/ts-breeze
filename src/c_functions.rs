@@ -4,14 +4,11 @@ use std::{
 };
 
 use neorg_dirman::c_functions::FileList;
-use tree_sitter::{
-    ffi::{TSLanguage, TSTree},
-    Tree,
-};
+use tree_sitter::ffi::{TSLanguage, TSTree};
 
 use crate::breeze;
 
-type Callback = unsafe extern "C" fn(tree: *mut TSTree);
+type Callback = unsafe extern "C" fn(tree: *mut TSTree, file: *const c_char, src: *const c_char);
 
 pub unsafe extern "C" fn parse_file_list(
     file_list: *const FileList,
@@ -40,21 +37,22 @@ pub unsafe extern "C" fn parse_file_list(
     unsafe impl Sync for Wrapper {}
 
     impl Wrapper {
-        unsafe fn call(&self, tree: *mut TSTree) {
-            (self.0)(tree);
+        unsafe fn call(&self, tree: *mut TSTree, file: *const c_char, src: *const c_char) {
+            (self.0)(tree, file, src);
         }
     }
 
     let callback = Wrapper(callback);
 
-    breeze::parse_files(files, language, Some(4), move |tree: Tree| {
-        callback.call(tree.into_raw())
+    breeze::parse_files(files, language, Some(4), move |tree, (file, src)| {
+        callback.call(tree.into_raw(), file.as_os_str().to_string_lossy().as_ptr() as *const c_char, src.as_bytes().as_ptr() as *const c_char)
     });
 }
 
 #[cfg(test)]
 mod tests {
     use std::ffi::CString;
+    use tree_sitter::Tree;
 
     use super::*;
     use neorg_dirman::c_functions::*;
@@ -63,7 +61,7 @@ mod tests {
     fn test_parse_file_list() {
         let language = tree_sitter_norg::language();
 
-        unsafe extern "C" fn callback(tree: *mut TSTree) {
+        unsafe extern "C" fn callback(tree: *mut TSTree, _: *const c_char, _: *const c_char) {
             assert!(Tree::from_raw(tree).root_node().kind() == "document");
         }
 

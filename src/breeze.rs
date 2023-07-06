@@ -3,14 +3,14 @@
 use anyhow::{anyhow, Result};
 use std::io::Read;
 use std::path::PathBuf;
-use std::{fs::File, sync::Arc};
+use std::{fs::File, sync::{Arc, Mutex}};
 use rusty_pool::Builder;
 use tree_sitter::{Language, Parser, Tree};
 
 /// Parses a file and returns its [`Tree`].
 ///
 /// * `filepath`: The path of the file to read.
-fn parse_file(filepath: &std::path::PathBuf, parser: &mut Parser) -> Result<Tree> {
+fn parse_file(filepath: &std::path::PathBuf, parser: &mut Parser) -> Result<(Tree, String)> {
     let mut file = File::open(filepath)?;
 
     let mut content = String::new();
@@ -18,34 +18,39 @@ fn parse_file(filepath: &std::path::PathBuf, parser: &mut Parser) -> Result<Tree
 
     drop(file);
 
-    parser.parse(content, None).ok_or_else(|| {
-        anyhow!(format!(
+    match parser.parse(&content, None) {
+        Some(tree) => Ok((tree, content)),
+        None => Err(anyhow!(format!(
             "Parsing for file '{}' timed out!",
             filepath.display()
-        ))
-    })
+        )))
+    }
 }
 
 pub fn parse_files<F>(files: Vec<PathBuf>, language: Language, num_jobs: Option<usize>, callback: F)
 where
-    F: Fn(Tree) + Send + Sync + 'static,
+    F: FnMut(Tree, (PathBuf, String)) + Send + Sync + 'static,
 {
     let threadpool = Builder::new()
         .name("neorg".into())
         .max_size(num_jobs.unwrap_or(4))
         .build();
 
-    let callback = Arc::new(callback);
+    let callback = Arc::new(Mutex::new(callback));
 
     for file in files {
+        if file.is_dir() {
+            continue;
+        }
+
         let callback = Arc::clone(&callback);
 
         threadpool.execute(move || {
             let mut parser = Parser::new();
             parser.set_language(language).unwrap();
 
-            let tree = parse_file(&file, &mut parser).unwrap();
-            callback(tree);
+            let (tree, src) = parse_file(&file, &mut parser).unwrap();
+            callback.lock().unwrap()(tree, (file, src));
         });
     }
 
@@ -63,7 +68,7 @@ mod tests {
         let filepath = PathBuf::from("test/example_workspace/file1.norg");
         let mut parser = Parser::new();
         parser.set_language(tree_sitter_norg::language()).unwrap();
-        let tree = parse_file(&filepath, &mut parser).unwrap();
+        let (tree, _) = parse_file(&filepath, &mut parser).unwrap();
 
         assert!(tree.root_node().kind() == "document");
     }
@@ -79,7 +84,7 @@ mod tests {
             workspace.files(),
             tree_sitter_norg::language(),
             None,
-            &|tree: Tree| assert!(tree.root_node().kind() == "document"),
+            |tree: Tree, _| assert!(tree.root_node().kind() == "document"),
         );
     }
 }
