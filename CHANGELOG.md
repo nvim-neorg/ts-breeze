@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/nvim-neorg/ts-breeze/compare/v1.0.0...v1.0.1) (2023-12-31)
+
+
+### Bug Fixes
+
+* add specific dependencies to Cargo.toml ([fd88cfb](https://github.com/nvim-neorg/ts-breeze/commit/fd88cfb616cbeb281afa053827a75d01eeb0a67c))
+
 ## [1.0.0](https://github.com/nvim-neorg/neorg-breeze/compare/v0.1.0...v1.0.0) (2023-05-16)
 
 
